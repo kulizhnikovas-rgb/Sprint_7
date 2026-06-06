@@ -40,14 +40,42 @@ def register_new_courier_and_return_login_password():
     # возвращаем список
     return login_pass 
 
-@pytest.fixture
-def registered_courier():
-    courier_info = register_new_courier_and_return_login_password()
+
+
+
+@pytest.fixture(scope="function")
+def cleanup_courier():
     
-    yield courier_info  
+    courier_data = {}
+    yield courier_data  
+   
+    if "login" in courier_data and "password" in courier_data:
+        login_resp = requests.post(Urls.LOGIN_COURIER, data={
+            "login": courier_data["login"], 
+            "password": courier_data["password"]
+        })
+        if login_resp.status_code == 200:
+            courier_id = login_resp.json().get("id")
+            requests.delete(f"{Urls.CREATE_COURIER}/{courier_id}")
+
+
+@pytest.fixture(scope="function")
+def registered_courier():
+    
+    courier_info = register_new_courier_and_return_login_password()
+    yield courier_info
     
     login_payload = {"login": courier_info[0], "password": courier_info[1]}
-    login_response = requests.post(Urls.LOGIN_COURIER, data=login_payload)
-    courier_id = login_response.json()["id"]
+    login_resp = requests.post(Urls.LOGIN_COURIER, data=login_payload)
     
-    requests.delete(f"{Urls.CREATE_COURIER}/{courier_id}")
+    if login_resp.status_code == 200:
+        courier_id = login_resp.json().get("id")
+        requests.delete(f"{Urls.CREATE_COURIER}/{courier_id}")
+
+
+@pytest.fixture(scope="function")
+def existing_courier():
+
+    courier_info = register_new_courier_and_return_login_password()
+    return courier_info
+

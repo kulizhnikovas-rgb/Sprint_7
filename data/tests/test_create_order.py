@@ -3,6 +3,7 @@ import requests
 import random
 import allure
 from data.urls import Urls
+from data.courier_data import OrderTestData
 
 @allure.epic("Работа с заказами")
 class TestOrders:
@@ -16,26 +17,23 @@ class TestOrders:
         []
     ])
     def test_create_order_with_various_colors(self, colors):
-        unique_id = random.randint(100000, 999999)
-        order_payload = {
-            "firstName": "Имя_" + str(unique_id),
-            "lastName": "Фамилия_" + str(unique_id),
-            "address": "Улица Тестовая, дом " + str(unique_id),
-            "metroStation": random.randint(1, 10),
-            "phone": "+7999" + str(unique_id),
-            "rentTime": 3,
-            "deliveryDate": "2026-12-12",
-            "comment": "Тестовый комментарий " + str(unique_id),
-            "color": colors
-        }
-        response = requests.post(Urls.ORDERS, json=order_payload)
-        assert response.status_code == 201
-        assert "track" in response.json()
+        order_payload = OrderTestData.generate_order_payload(colors)
+        
+        with allure.step(f"Отправка POST-запроса на создание заказа с цветом {colors}"):
+            response = requests.post(Urls.ORDERS, json=order_payload)
+        
+        with allure.step("Проверка успешного создания заказа (код 201 и наличие трек-номера)"):
+            assert response.status_code == 201
+            assert "track" in response.json()
 
     @allure.feature("Список заказов")
     @allure.title("Успешное получение списка заказов")
     def test_get_orders_list_returns_list(self):
-        response = requests.get(Urls.ORDERS)
-        assert response.status_code == 200
-        assert "orders" in response.json()
-        assert isinstance(response.json()["orders"], list)
+        
+        with allure.step("Отправка GET-запроса на получение списка заказов"):
+            response = requests.get(Urls.ORDERS)
+        
+        with allure.step("Проверка успешного ответа (код 200) и структуры списка заказов"):
+            assert response.status_code == 200
+            assert "orders" in response.json()
+            assert isinstance(response.json()["orders"], list)

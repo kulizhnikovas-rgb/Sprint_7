@@ -3,6 +3,7 @@ import requests
 import random
 import allure
 from data.urls import Urls
+from data.courier_data import CourierTestData
 
 @allure.epic("Работа с курьерами")
 @allure.feature("Авторизация курьера")
@@ -13,9 +14,13 @@ class TestLoginCourier:
         login = registered_courier[0]
         password = registered_courier[1]
         payload = {"login": login, "password": password}
-        response = requests.post(Urls.LOGIN_COURIER, data=payload)
-        assert response.status_code == 200
-        assert "id" in response.json()
+        
+        with allure.step("Отправка POST-запроса на авторизацию курьера"):
+            response = requests.post(Urls.LOGIN_COURIER, data=payload)
+        
+        with allure.step("Проверка успешного ответа (код 200 и наличие id)"):
+            assert response.status_code == 200
+            assert "id" in response.json()
 
     @allure.title("Ошибка авторизации, если не передано одно из полей")
     @pytest.mark.parametrize("missing_field", ["login", "password"])
@@ -24,38 +29,59 @@ class TestLoginCourier:
         password = registered_courier[1]
         payload = {"login": login, "password": password}
         del payload[missing_field]
-        response = requests.post(Urls.LOGIN_COURIER, data=payload)
-        assert response.status_code == 400
-        assert response.json()["message"] == "Недостаточно данных для входа"
-
-    @allure.title("Ошибка авторизации при неверном логине или пароле")
-    @pytest.mark.parametrize("is_login_wrong, is_password_wrong", [
-        (True, False),
-        (False, True)
-    ])
-    def test_login_with_wrong_credentials_error(self, registered_courier, is_login_wrong, is_password_wrong):
-        real_login = registered_courier[0]
-        real_password = registered_courier[1]
-        final_login = real_login
-        final_password = real_password
         
-        if is_login_wrong:
-            final_login = "wrong_login_12345"
-        if is_password_wrong:
-            final_password = "wrong_password_9999"
+        with allure.step(f"Отправка запроса на авторизацию без поля {missing_field}"):
+            response = requests.post(Urls.LOGIN_COURIER, data=payload)
+        
+        with allure.step("Проверка ошибки валидации полей (код 400)"):
+            assert response.status_code == 400
+            assert response.json()["message"] == "Недостаточно данных для входа"
+
+    @allure.title("Ошибка авторизации при неверном логине")
+    def test_login_with_wrong_login_error(self, registered_courier):
+        real_password = registered_courier[1]
+        
+        payload = {
+            "login": CourierTestData.WRONG_LOGIN, 
+            "password": real_password            
+        }
+        
+        with allure.step("Отправка запроса на авторизацию с неверным логином"):
+            response = requests.post(Urls.LOGIN_COURIER, data=payload)
             
-        payload = {"login": final_login, "password": final_password}
-        response = requests.post(Urls.LOGIN_COURIER, data=payload)
-        assert response.status_code == 404
-        assert response.json()["message"] == "Учетная запись не найдена"
+        with allure.step("Проверка ошибки (код 404) и текста сообщения"):
+            assert response.status_code == 404
+            assert response.json()["message"] == "Учетная запись не найдена"
+
+
+    @allure.title("Ошибка авторизации при неверном пароле")
+    def test_login_with_wrong_password_error(self, registered_courier):
+        real_login = registered_courier[0]
+        
+        payload = {
+            "login": real_login,                     
+            "password": CourierTestData.WRONG_PASSWORD
+        }
+        
+        with allure.step("Отправка запроса на авторизацию с неверным паролем"):
+            response = requests.post(Urls.LOGIN_COURIER, data=payload)
+            
+        with allure.step("Проверка ошибки (код 404) и текста сообщения"):
+            assert response.status_code == 404
+            assert response.json()["message"] == "Учетная запись не найдена"
+
 
     @allure.title("Ошибка авторизации под несуществующим пользователем")
     def test_login_non_existent_user_error(self):
         unique_number = random.randint(100000, 999999)
         payload = {
-            "login": "non_existent_user_" + str(unique_number),
-            "password": "any_password"
+            "login": f"{CourierTestData.NON_EXISTENT_PREFIX}{unique_number}",
+            "password": CourierTestData.ANY_PASSWORD
         }
-        response = requests.post(Urls.LOGIN_COURIER, data=payload)
-        assert response.status_code == 404
-        assert response.json()["message"] == "Учетная запись не найдена"
+        
+        with allure.step("Отправка запроса на авторизацию под вымышленным пользователем"):
+            response = requests.post(Urls.LOGIN_COURIER, data=payload)
+        
+        with allure.step("Проверка ошибки отсутствия пользователя в базе (код 404)"):
+            assert response.status_code == 404
+            assert response.json()["message"] == "Учетная запись не найдена"
